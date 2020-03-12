@@ -36,6 +36,7 @@ func init() {
 	})
 }
 
+//获取音频列表
 func GetAudioList(c *gin.Context) {
 	audioList := client.LRange("audio-list", 0, -1)
 
@@ -51,6 +52,7 @@ func GetAudioList(c *gin.Context) {
 	})
 }
 
+//删除音频信息
 func DeleteAudio(c *gin.Context) {
 	name := c.Param("name")
 	client.LRem("audio-list", 0, name)
@@ -64,6 +66,7 @@ func DeleteAudio(c *gin.Context) {
 	})
 }
 
+//新增音频信息
 func AddAudio(c *gin.Context) {
 	audioInfo := make(map[string]interface{})
 	err := c.BindJSON(&audioInfo)
@@ -92,6 +95,7 @@ func AddAudio(c *gin.Context) {
 	})
 }
 
+//文件上传
 func UploadFiles(c *gin.Context) {
 	name := c.PostForm("name")
 	file, header, err := c.Request.FormFile("file")
@@ -140,6 +144,7 @@ func UploadFiles(c *gin.Context) {
 	}
 }
 
+//文件下载
 func DownloadFile(c *gin.Context) {
 	name := c.Param("name")
 	fileType := c.Param("type")[1:]

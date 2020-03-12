@@ -18,7 +18,10 @@ func InitRouter() *gin.Engine {
 	gin.SetMode(conf.RunMode)
 
 	r.GET("/api/login", api.Login)
-	// NetEase lyric
+	// NetEase API
+	r.GET("/api/playlist", api.GetPlayList)
+	r.GET("/api/song/detail", api.GetSongDetail)
+	r.GET("/api/song/url", api.GetSongURL)
 	r.GET("/api/lyric", api.GetLyric)
 
 	handler := r.Group("/api")
