@@ -18,11 +18,12 @@ func InitRouter() *gin.Engine {
 	gin.SetMode(conf.RunMode)
 
 	r.GET("/api/login", api.Login)
+	r.GET("/api/batch", api.BatchDownload)
 	// NetEase API
-	r.GET("/api/playlist", api.GetPlayList)
-	r.GET("/api/song/detail", api.GetSongDetail)
-	r.GET("/api/song/url", api.GetSongURL)
-	r.GET("/api/lyric", api.GetLyric)
+	r.GET("/api/playlist", api.PlayList)
+	r.GET("/api/song/detail", api.SongDetail)
+	r.GET("/api/song/url", api.SongURL)
+	r.GET("/api/lyric", api.SongLyric)
 
 	handler := r.Group("/api")
 	handler.Use(middleware.JWT())

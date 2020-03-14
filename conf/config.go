@@ -12,7 +12,7 @@ var (
 
 	RunMode string
 
-	FilePath  string
+	FileDIR   string
 	FileTypes map[string]string
 
 	UserName string
@@ -52,7 +52,7 @@ func loadServer() {
 
 func loadApp() {
 	JwtSecret = Cfg.Section("").Key("JWT_SECRET").MustString("akari")
-	FilePath = Cfg.Section("file").Key("PATH").MustString("static/")
+	FileDIR = Cfg.Section("file").Key("DIR").MustString("static/")
 	FileTypes = map[string]string{
 		"mp3":  "audio",
 		"lrc":  "lrc",

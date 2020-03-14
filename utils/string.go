@@ -3,6 +3,8 @@ package utils
 import (
 	"fmt"
 	"hash/fnv"
+	"math/rand"
+	"time"
 )
 
 func HashName(s string) string {
@@ -18,4 +20,8 @@ func InList(l []string, n string) bool {
 		}
 	}
 	return false
+}
+
+func GetRandom() string {
+	return fmt.Sprintf("%10v", rand.New(rand.NewSource(time.Now().UnixNano())).Int31n(10000000000))
 }

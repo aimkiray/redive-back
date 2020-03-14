@@ -2,10 +2,8 @@ package utils
 
 import (
 	"io/ioutil"
-	"log"
 	"math/rand"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -33,27 +31,17 @@ var userAgentList = [19]string{
 	"Mozilla/5.0 (iPad; CPU OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A300 Safari/602.1",
 }
 
-func DoPostRequest(cookies []*http.Cookie, address, params, encSecKey string) ([]byte, error) {
+func DoPostRequest(address, params, encSecKey string) ([]byte, error) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	result := url.Values{}
 	result.Set("params", params)
 	result.Set("encSecKey", encSecKey)
 	body := strings.NewReader(result.Encode())
-	j, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, nil
-	}
-	client := &http.Client{Jar: j}
+	client := &http.Client{}
 	request, err := http.NewRequest("POST", address, body)
 	if err != nil {
 		return nil, nil
 	}
-	reqUrl, err := url.Parse(address)
-	if err != nil {
-		return nil, nil
-	}
-	j.SetCookies(reqUrl, cookies)
-	log.Println(request.Cookies())
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Referer", "http://music.163.com")
 	request.Header.Set("Accept", "*/*")
@@ -72,24 +60,17 @@ func DoPostRequest(cookies []*http.Cookie, address, params, encSecKey string) ([
 	return resBody, nil
 }
 
-func DoGetRequest(cookies []*http.Cookie, address string) ([]byte, error) {
+func DoGetRequest(address string) ([]byte, error) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	j, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, nil
-	}
-	client := &http.Client{Jar: j}
-	reqUrl, err := url.Parse(address)
-	if err != nil {
-		return nil, nil
-	}
-	j.SetCookies(reqUrl, cookies)
+	client := &http.Client{}
 	request, err := http.NewRequest("GET", address, nil)
+	if err != nil {
+		return nil, err
+	}
 	request.Header.Set("Referer", "http://music.163.com")
 	request.Header.Set("User-Agent", userAgentList[r.Intn(19)])
 	res, err := client.Do(request)
 	defer res.Body.Close()
-	// 错误处理
 	if err != nil {
 		return nil, err
 	}
