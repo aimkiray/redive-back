@@ -19,8 +19,9 @@ func InitRouter() *gin.Engine {
 
 	r.GET("/api/login", api.Login)
 	r.GET("/api/batch", api.BatchDownload)
+	r.GET("/api/batch/status", api.BatchStatus)
 	// NetEase API
-	r.GET("/api/playlist", api.PlayList)
+	r.GET("/api/song", api.PlayList)
 	r.GET("/api/song/detail", api.SongDetail)
 	r.GET("/api/song/url", api.SongURL)
 	r.GET("/api/lyric", api.SongLyric)

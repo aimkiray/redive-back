@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aimkiray/reosu-server/models"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,48 +17,15 @@ import (
 	"github.com/aimkiray/reosu-server/utils"
 )
 
-type Song struct {
-	Data []struct {
-		Url string `json:"url"`
-	} `json:"data"`
-	Code int `json:"code"`
-}
-
-type Lyric struct {
-	Lrc struct {
-		Lyric string `json:"lyric"`
-	} `json:"lrc"`
-	Tlyric struct {
-		Lyric string `json:"lyric"`
-	} `json:"tlyric"`
-	Code int `json:"code"`
-}
-
-type Play struct {
-	Playlist struct {
-		Tracks []struct {
-			Name string `json:"name"`
-			ID   int    `json:"id"`
-			Ar   []struct {
-				Name string `json:"name"`
-			} `json:"ar"`
-			Al struct {
-				PicUrl string `json:"picUrl"`
-			} `json:"al"`
-		} `json:"tracks"`
-		Name string `json:"name"`
-	} `json:"playlist"`
-	Code int `json:"code"`
-}
-
 func BatchDownload(c *gin.Context) {
 	id := c.Query("id")
 	s := c.DefaultQuery("s", "8")
+	br := c.DefaultQuery("br", "999000")
 
 	resPlay := GetPlayList(id, s)
 
-	var play Play
-	jsonErr := json.Unmarshal(resPlay, &play)
+	var playlist models.Playlist
+	jsonErr := json.Unmarshal(resPlay, &playlist)
 	if jsonErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    0,
@@ -67,23 +33,23 @@ func BatchDownload(c *gin.Context) {
 		})
 		return
 	}
-	baseFileDir := conf.FileDIR + "/music/" + play.Playlist.Name + "/"
+	alName := playlist.Playlist.Name
+	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(alName, "/", "*", -1) + "/"
 	createTime := time.Now().Format("2006/1/2 15:04:05")
 
-	tracks := play.Playlist.Tracks
+	tracks := playlist.Playlist.Tracks
+	songTotal := len(tracks)
 
 	utils.Client.LPush("file-process", "download")
 
-	// File download progress
-	fileProgress := make(map[string]interface{})
-	fileProgress["current"] = 0
-	fileProgress["total"] = len(tracks)
-	utils.Client.HMSet("download", fileProgress)
+	// File download process
+	SetStatus(0, songTotal, "")
 
 	// Loop download
-	for index := 0; index < len(tracks); index++ {
+	for index := 0; index < songTotal; index++ {
 		songID := strconv.Itoa(tracks[index].ID)
 		songName := tracks[index].Name
+		songArtist := tracks[index].Ar[0].Name
 
 		// Check song exists
 		audioList := utils.Client.LRange("audio-list", 0, -1)
@@ -96,144 +62,122 @@ func BatchDownload(c *gin.Context) {
 		alURL := tracks[index].Al.PicUrl
 		fileFrag := strings.Split(alURL, ".")
 		alSuffix := fileFrag[len(fileFrag)-1]
-		songDir := baseFileDir + songName + "/"
+		songDir := baseFileDir + songArtist + " - " + songName + "/"
 		os.MkdirAll(songDir, os.ModePerm)
 		// Save album cover
-		alPath := songDir + songName + "." + alSuffix
-		fileErr := DownloadURL(alURL, alPath)
+		alPath := songDir + songArtist + " - " + songName + "." + alSuffix
+		fileErr := utils.DownloadURL(alURL, alPath)
 		if fileErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "album cover, id=" + songID + fileErr.Error(),
 			})
-			return
+			continue
 		}
 
 		// Get song lyric
 		resLyric := GetLyric(songID)
 
-		var lyric Lyric
+		var lyric models.Lyric
 		jsonErr := json.Unmarshal(resLyric, &lyric)
 		if jsonErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "lyric json, id=" + songID + jsonErr.Error(),
 			})
-			return
+			continue
 		}
 		// Save lyric
-		lyricPath := songDir + songName + ".lrc"
-		fileErr = DownloadText(lyric.Lrc.Lyric, lyricPath)
+		lyricPath := songDir + songArtist + " - " + songName + ".lrc"
+		fileErr = utils.DownloadText(lyric.Lrc.Lyric, lyricPath)
 		if fileErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "lyric, id=" + songID + fileErr.Error(),
 			})
-			return
+			continue
 		}
 		// Save translate lyric
-		tlyricPath := songDir + songName + "_trans.lrc"
-		fileErr = DownloadText(lyric.Tlyric.Lyric, tlyricPath)
+		tlyricPath := songDir + songArtist + " - " + songName + "_trans.lrc"
+		fileErr = utils.DownloadText(lyric.Tlyric.Lyric, tlyricPath)
 		if fileErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "translate lyric, id=" + songID + fileErr.Error(),
 			})
-			return
+			continue
 		}
 
 		// Get song url
-		resSongURL := GetSongURL(songID, "999000")
-		var song Song
+		resSongURL := GetSongURL(songID, br)
+		var song models.Song
 		jsonErr = json.Unmarshal(resSongURL, &song)
 		if jsonErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "mp3 json, id=" + songID + jsonErr.Error(),
 			})
-			return
+			continue
 		}
 		// Save mp3 file
-		songPath := songDir + songName + ".mp3"
-		fileErr = DownloadURL(song.Data[0].Url, songPath)
+		songPath := songDir + songArtist + " - " + songName + ".mp3"
+		fileErr = utils.DownloadURL(song.Data[0].Url, songPath)
 		if fileErr != nil {
+			SetStatus(0, 0, "")
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"code":    0,
 				"message": "mp3, id=" + songID + fileErr.Error(),
 			})
-			return
+			continue
 		}
 
 		// Redis insert
-		songModel := &models.Audio{
-			ID:     songID,
-			Name:   songName,
-			Artist: tracks[index].Ar[0].Name,
-			Audio:  songPath,
-			Cover:  alPath,
-			Lrc:    lyricPath,
-			Tlrc:   tlyricPath,
-			Create: createTime,
-			From:   "batch",
-			Others: "",
-		}
-		var songInfo map[string]interface{}
+		songInfo := make(map[string]interface{})
 
-		jsonSong, _ := json.Marshal(songModel)
-		jsonErr = json.Unmarshal(jsonSong, &songInfo)
-		if jsonErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "json song error, id=" + songID + jsonErr.Error(),
-			})
-			return
-		}
+		songInfo["id"] = songID
+		songInfo["name"] = songName
+		songInfo["artist"] = tracks[index].Ar[0].Name
+		songInfo["audio"] = songPath
+		songInfo["cover"] = alPath
+		songInfo["lrc"] = lyricPath
+		songInfo["tlrc"] = tlyricPath
+		songInfo["create"] = createTime
+		songInfo["from"] = "batch"
+		songInfo["others"] = ""
 
 		utils.Client.LPush("audio-list", songID)
 		utils.Client.HMSet(songID, songInfo)
+
+		SetStatus(index, songTotal, songName)
 	}
+
+	// reset status
+	SetStatus(0, 0, "")
 	c.JSON(http.StatusOK, gin.H{
 		"code":    1,
 		"message": "batch import success",
 	})
 }
 
-func DownloadText(text string, filePath string) error {
-	lrcFile, err := os.Create(filePath)
-	defer lrcFile.Close()
-
-	if err != nil {
-		return err
-	}
-
-	_, err = lrcFile.Write([]byte(text))
-	if err != nil {
-		return err
-	}
-	return nil
+func BatchStatus(c *gin.Context) {
+	res := utils.Client.HGetAll("download").Val()
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"data": res,
+	})
 }
 
-func DownloadURL(fileURL string, filePath string) error {
-	// Get data
-	resp, err := http.Get(fileURL)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Create a file
-	outfile, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer outfile.Close()
-
-	// Response stream and file stream
-	_, err = io.Copy(outfile, resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+func SetStatus(count int, total int, current string) {
+	fileProcess := make(map[string]interface{})
+	fileProcess["count"] = count
+	fileProcess["total"] = total
+	fileProcess["current"] = current
+	utils.Client.HMSet("download", fileProcess)
 }
 
 //获取歌单内容，返回歌单内歌曲的简略信息

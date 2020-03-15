@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -31,6 +33,52 @@ var userAgentList = [19]string{
 	"Mozilla/5.0 (iPad; CPU OS 10_0 like Mac OS X) AppleWebKit/602.1.38 (KHTML, like Gecko) Version/10.0 Mobile/14A300 Safari/602.1",
 }
 
+func DownloadText(text string, filePath string) error {
+	lrcFile, err := os.Create(filePath)
+	defer lrcFile.Close()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = lrcFile.Write([]byte(text))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func DownloadURL(fileURL string, filePath string) error {
+	// Get data
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	client := &http.Client{}
+	request, err := http.NewRequest("GET", fileURL, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Referer", "http://music.163.com")
+	request.Header.Set("User-Agent", userAgentList[r.Intn(19)])
+	resp, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create a file
+	outfile, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+
+	// Response stream and file stream
+	_, err = io.Copy(outfile, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func DoPostRequest(address, params, encSecKey string) ([]byte, error) {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	result := url.Values{}
@@ -48,12 +96,12 @@ func DoPostRequest(address, params, encSecKey string) ([]byte, error) {
 	request.Header.Set("Accept-Language", "zh-CN,zh;q=0.8,gl;q=0.6,zh-TW;q=0.4")
 	request.Header.Set("Cookie", "appver=2.0.2")
 	request.Header.Set("User-Agent", userAgentList[r.Intn(19)])
-	res, err := client.Do(request)
-	defer res.Body.Close()
+	resp, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
-	resBody, err := ioutil.ReadAll(res.Body)
+	defer resp.Body.Close()
+	resBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -69,11 +117,11 @@ func DoGetRequest(address string) ([]byte, error) {
 	}
 	request.Header.Set("Referer", "http://music.163.com")
 	request.Header.Set("User-Agent", userAgentList[r.Intn(19)])
-	res, err := client.Do(request)
-	defer res.Body.Close()
+	resp, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
-	resBody, err := ioutil.ReadAll(res.Body)
+	defer resp.Body.Close()
+	resBody, err := ioutil.ReadAll(resp.Body)
 	return resBody, err
 }
