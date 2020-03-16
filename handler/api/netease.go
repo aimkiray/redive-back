@@ -22,6 +22,11 @@ func BatchDownload(c *gin.Context) {
 	s := c.DefaultQuery("s", "8")
 	br := c.DefaultQuery("br", "999000")
 
+	// record error message
+	utils.Client.Del("error")
+	var errSongList []map[string]interface{}
+	//errSongList := make([]map[string]string, 0)
+
 	resPlay := GetPlayList(id, s)
 
 	var playlist models.Playlist
@@ -43,13 +48,13 @@ func BatchDownload(c *gin.Context) {
 	utils.Client.LPush("file-process", "download")
 
 	// File download process
-	SetStatus(0, songTotal, "")
+	SetStatus(0, songTotal, "", nil)
 
 	// Loop download
-	for index := 0; index < songTotal; index++ {
-		songID := strconv.Itoa(tracks[index].ID)
-		songName := tracks[index].Name
-		songArtist := tracks[index].Ar[0].Name
+	for index, value := range tracks {
+		songID := strconv.Itoa(value.ID)
+		songName := value.Name
+		songArtist := value.Ar[0].Name
 
 		// Check song exists
 		audioList := utils.Client.LRange("audio-list", 0, -1)
@@ -58,21 +63,62 @@ func BatchDownload(c *gin.Context) {
 			continue
 		}
 
-		// Get album cover
-		alURL := tracks[index].Al.PicUrl
-		fileFrag := strings.Split(alURL, ".")
-		alSuffix := fileFrag[len(fileFrag)-1]
 		songDir := baseFileDir + songArtist + " - " + songName + "/"
 		os.MkdirAll(songDir, os.ModePerm)
+
+		// Get song url
+		resSongURL := GetSongURL(songID, br)
+		var song models.Song
+		jsonErr = json.Unmarshal(resSongURL, &song)
+		if jsonErr != nil {
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "song json"
+			errSongList = append(errSongList, errSong)
+
+			continue
+		}
+		// Save mp3 file
+		songPath := songDir + songArtist + " - " + songName + ".mp3"
+		songURL := song.Data[0].Url
+
+		// Song is unavailable
+		if songURL == "" {
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "song is unavailable"
+			errSongList = append(errSongList, errSong)
+
+			continue
+		}
+		fileErr := utils.DownloadURL(songURL, songPath)
+		if fileErr != nil {
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "song file"
+			errSongList = append(errSongList, errSong)
+
+			continue
+		}
+
+		// Get album cover
+		alURL := value.Al.PicUrl
+		fileFrag := strings.Split(alURL, ".")
+		alSuffix := fileFrag[len(fileFrag)-1]
+
 		// Save album cover
 		alPath := songDir + songArtist + " - " + songName + "." + alSuffix
-		fileErr := utils.DownloadURL(alURL, alPath)
+		fileErr = utils.DownloadURL(alURL, alPath)
 		if fileErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "album cover, id=" + songID + fileErr.Error(),
-			})
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "cover file"
+			errSongList = append(errSongList, errSong)
+
 			continue
 		}
 
@@ -82,57 +128,36 @@ func BatchDownload(c *gin.Context) {
 		var lyric models.Lyric
 		jsonErr := json.Unmarshal(resLyric, &lyric)
 		if jsonErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "lyric json, id=" + songID + jsonErr.Error(),
-			})
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "lyric json"
+			errSongList = append(errSongList, errSong)
+
 			continue
 		}
 		// Save lyric
 		lyricPath := songDir + songArtist + " - " + songName + ".lrc"
 		fileErr = utils.DownloadText(lyric.Lrc.Lyric, lyricPath)
 		if fileErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "lyric, id=" + songID + fileErr.Error(),
-			})
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "lyric file"
+			errSongList = append(errSongList, errSong)
+
 			continue
 		}
 		// Save translate lyric
 		tlyricPath := songDir + songArtist + " - " + songName + "_trans.lrc"
 		fileErr = utils.DownloadText(lyric.Tlyric.Lyric, tlyricPath)
 		if fileErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "translate lyric, id=" + songID + fileErr.Error(),
-			})
-			continue
-		}
+			errSong := make(map[string]interface{})
+			errSong["id"] = songID
+			errSong["name"] = songName
+			errSong["type"] = "translate lyric file"
+			errSongList = append(errSongList, errSong)
 
-		// Get song url
-		resSongURL := GetSongURL(songID, br)
-		var song models.Song
-		jsonErr = json.Unmarshal(resSongURL, &song)
-		if jsonErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "mp3 json, id=" + songID + jsonErr.Error(),
-			})
-			continue
-		}
-		// Save mp3 file
-		songPath := songDir + songArtist + " - " + songName + ".mp3"
-		fileErr = utils.DownloadURL(song.Data[0].Url, songPath)
-		if fileErr != nil {
-			SetStatus(0, 0, "")
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    0,
-				"message": "mp3, id=" + songID + fileErr.Error(),
-			})
 			continue
 		}
 
@@ -141,7 +166,7 @@ func BatchDownload(c *gin.Context) {
 
 		songInfo["id"] = songID
 		songInfo["name"] = songName
-		songInfo["artist"] = tracks[index].Ar[0].Name
+		songInfo["artist"] = value.Ar[0].Name
 		songInfo["audio"] = songPath
 		songInfo["cover"] = alPath
 		songInfo["lrc"] = lyricPath
@@ -153,11 +178,11 @@ func BatchDownload(c *gin.Context) {
 		utils.Client.LPush("audio-list", songID)
 		utils.Client.HMSet(songID, songInfo)
 
-		SetStatus(index, songTotal, songName)
+		SetStatus(index, songTotal, songName, nil)
 	}
 
-	// reset status
-	SetStatus(0, 0, "")
+	// return status
+	SetStatus(0, 0, "", errSongList)
 	c.JSON(http.StatusOK, gin.H{
 		"code":    1,
 		"message": "batch import success",
@@ -166,17 +191,41 @@ func BatchDownload(c *gin.Context) {
 
 func BatchStatus(c *gin.Context) {
 	res := utils.Client.HGetAll("download").Val()
+	// read error list
+	var errSongList []map[string]string
+	if res["status"] == "1" {
+		err := utils.Client.LRange("error", 0, -1).Val()
+		for _, value := range err {
+			errSong := utils.Client.HGetAll(value).Val()
+			errSongList = append(errSongList, errSong)
+		}
+		utils.Client.HSet("download", "status", 0)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"code": 1,
-		"data": res,
+		"code":  1,
+		"data":  res,
+		"error": errSongList,
 	})
 }
 
-func SetStatus(count int, total int, current string) {
+func SetStatus(count int, total int, current string, err []map[string]interface{}) {
 	fileProcess := make(map[string]interface{})
 	fileProcess["count"] = count
 	fileProcess["total"] = total
 	fileProcess["current"] = current
+
+	if err != nil {
+		fileProcess["status"] = 1
+		for _, value := range err {
+			id := value["id"].(string)
+			utils.Client.LPush("error", id)
+			utils.Client.HMSet(id, value)
+		}
+	} else {
+		fileProcess["status"] = 1
+	}
+
 	utils.Client.HMSet("download", fileProcess)
 }
 
@@ -216,8 +265,8 @@ func GetSongDetail(ids string) []byte {
 	idsList := strings.Split(ids, ",")
 	idJson := ""
 
-	for id := 0; id < len(idsList); id++ {
-		idJson += fmt.Sprintf(`{\"id\":\"%s\"},`, idsList[id])
+	for _, id := range idsList {
+		idJson += fmt.Sprintf(`{\"id\":\"%s\"},`, id)
 	}
 	idJson = idJson[0 : len(idJson)-1]
 
