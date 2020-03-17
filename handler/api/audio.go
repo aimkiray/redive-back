@@ -15,29 +15,50 @@ import (
 	"github.com/aimkiray/reosu-server/utils"
 )
 
-//获取音频列表
-func GetAudioList(c *gin.Context) {
-	audioList := utils.Client.LRange("audio-list", 0, -1)
+//获取歌单列表
+func GetAllPlayList(c *gin.Context) {
+	playlist := utils.Client.LRange("playlist", 0, -1)
 
-	type info map[string]string
-	infoList := make([]info, len(audioList.Val()))
+	infoList := make([]map[string]string, len(playlist.Val()))
 
-	for idx, v := range audioList.Val() {
-		res := utils.Client.HGetAll(v).Val()
-		infoList[idx] = res
+	for index, value := range playlist.Val() {
+		res := utils.Client.HGetAll(value).Val()
+		infoList[index] = res
 	}
 	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"data": infoList,
+	})
+}
+
+//获取音频列表
+func GetAllAudio(c *gin.Context) {
+	plID := c.Query("id")
+	audioList := utils.Client.LRange(plID, 0, -1)
+
+	infoList := make([]map[string]string, len(audioList.Val()))
+
+	for index, value := range audioList.Val() {
+		res := utils.Client.HGetAll(value).Val()
+		infoList[index] = res
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
 		"data": infoList,
 	})
 }
 
 //删除音频信息
 func DeleteAudio(c *gin.Context) {
-	name := c.Param("name")
-	utils.Client.LRem("audio-list", 0, name)
-	utils.Client.Del(name)
+	id := c.Param("id")
 
-	os.RemoveAll(conf.FileDIR + "/" + utils.HashName(name))
+	plId := utils.Client.HGet(id, "playlist").Val()
+	plName := utils.Client.HGet(plId, "name").Val()
+
+	utils.Client.LRem(plId, 0, id)
+	utils.Client.Del(id)
+
+	os.RemoveAll(conf.FileDIR + "/" + strings.Replace(plName, "/", "*", -1))
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 1,
@@ -50,17 +71,17 @@ func AddAudio(c *gin.Context) {
 	audioInfo := make(map[string]interface{})
 	err := c.BindJSON(&audioInfo)
 	if err != nil {
-		//log.Fatalf("decode param error :%v", err)
 		c.JSON(http.StatusOK, gin.H{
 			"code": 0,
 			"msg":  "decode error",
 		})
+		return
 	}
 
 	// generate song ID
 	// TODO update
 	songID := utils.GetRandom()
-	audioInfo["ID"] = songID
+	audioInfo["id"] = songID
 	//name := audioInfo["name"].(string)
 	audioInfo["create"] = time.Now().Format("2006/1/2 15:04:05")
 
@@ -73,11 +94,13 @@ func AddAudio(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code": 1,
 		"msg":  "add audio success",
+		"id":   songID,
 	})
 }
 
 //文件上传
 func UploadFiles(c *gin.Context) {
+	id := c.PostForm("id")
 	name := c.PostForm("name")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -93,7 +116,7 @@ func UploadFiles(c *gin.Context) {
 	fileSuffix := fileFrag[len(fileFrag)-1]
 
 	if v, ok := conf.FileTypes[fileSuffix]; ok {
-		localFileDir := conf.FileDIR + "/" + utils.HashName(name)
+		localFileDir := conf.FileDIR + "/" + name
 
 		os.MkdirAll(localFileDir, os.ModePerm)
 
@@ -102,16 +125,15 @@ func UploadFiles(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"code": 0,
-				"msg":  "create" + localFileDir + " file error",
+				"msg":  "create" + localFileDir + " file error. " + err.Error(),
 			})
-			//log.Fatalf("create %s file error %v", localFileDir, err)
-			//return
+			return
 		}
 
 		defer localFile.Close()
 		io.Copy(localFile, file)
 
-		utils.Client.HSet(name, v, localFileDir+"/"+fileName)
+		utils.Client.HSet(id, v, localFileDir+"/"+fileName)
 
 		c.JSON(http.StatusOK, gin.H{
 			"code": 1,
@@ -127,24 +149,23 @@ func UploadFiles(c *gin.Context) {
 
 //文件下载
 func DownloadFile(c *gin.Context) {
-	name := c.Param("name")
+	id := c.Param("id")
 	fileType := c.Param("type")[1:]
 
-	info := utils.Client.HGetAll(name).Val()
+	info := utils.Client.HGetAll(id).Val()
 	if filePath, ok := info[fileType]; ok {
 		content, err := ioutil.ReadFile(filePath)
 		if err != nil {
-			//log.Fatalf("open file %s error : %v", filePath, err)
-			//return
 			c.JSON(http.StatusBadRequest, gin.H{
 				"code": 0,
-				"msg":  "open file " + filePath + " error",
+				"msg":  "open file " + filePath + " error. " + err.Error(),
 			})
+			return
 		}
 		fileFrag := strings.Split(filePath, ".")
 		fileSuffix := fileFrag[len(fileFrag)-1]
 		c.Writer.WriteHeader(http.StatusOK)
-		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", name+"."+fileSuffix))
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", info["name"]+"."+fileSuffix))
 		c.Header("Content-Type", "application/text/plain")
 		c.Header("Accept-Length", fmt.Sprintf("%d", len(content)))
 		c.Writer.Write([]byte(content))

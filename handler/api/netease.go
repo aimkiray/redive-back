@@ -38,8 +38,20 @@ func BatchDownload(c *gin.Context) {
 		})
 		return
 	}
-	alName := playlist.Playlist.Name
-	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(alName, "/", "*", -1) + "/"
+
+	// 生成Playlist
+	plID := utils.GetRandom()
+	plName := playlist.Playlist.Name
+	playlistInfo := make(map[string]interface{})
+	playlistInfo["id"] = plID
+	playlistInfo["name"] = plName
+
+	// 保存Playlist
+	utils.Client.LPush("playlist", plID)
+	utils.Client.HMSet(plID, playlistInfo)
+	// 插入Playlist，用于存放歌曲信息
+	utils.Client.LPush("audio-list", plID)
+	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(plName, "/", "*", -1) + "/"
 	createTime := time.Now().Format("2006/1/2 15:04:05")
 
 	tracks := playlist.Playlist.Tracks
@@ -48,7 +60,7 @@ func BatchDownload(c *gin.Context) {
 	utils.Client.LPush("file-process", "download")
 
 	// File download process
-	SetStatus(0, songTotal, "", nil)
+	SetStatus(0, songTotal, "", 0, nil)
 
 	// Loop download
 	for index, value := range tracks {
@@ -166,6 +178,7 @@ func BatchDownload(c *gin.Context) {
 
 		songInfo["id"] = songID
 		songInfo["name"] = songName
+		songInfo["playlist"] = plID
 		songInfo["artist"] = value.Ar[0].Name
 		songInfo["audio"] = songPath
 		songInfo["cover"] = alPath
@@ -175,14 +188,14 @@ func BatchDownload(c *gin.Context) {
 		songInfo["from"] = "batch"
 		songInfo["others"] = ""
 
-		utils.Client.LPush("audio-list", songID)
+		utils.Client.LPush(plID, songID)
 		utils.Client.HMSet(songID, songInfo)
 
-		SetStatus(index, songTotal, songName, nil)
+		SetStatus(index, songTotal, songName, 0, nil)
 	}
 
 	// return status
-	SetStatus(0, 0, "", errSongList)
+	SetStatus(0, 0, "", 1, errSongList)
 	c.JSON(http.StatusOK, gin.H{
 		"code":    1,
 		"message": "batch import success",
@@ -195,9 +208,10 @@ func BatchStatus(c *gin.Context) {
 	var errSongList []map[string]string
 	if res["status"] == "1" {
 		err := utils.Client.LRange("error", 0, -1).Val()
-		for _, value := range err {
+		errSongList = make([]map[string]string, len(err))
+		for index, value := range err {
 			errSong := utils.Client.HGetAll(value).Val()
-			errSongList = append(errSongList, errSong)
+			errSongList[index] = errSong
 		}
 		utils.Client.HSet("download", "status", 0)
 	}
@@ -209,21 +223,19 @@ func BatchStatus(c *gin.Context) {
 	})
 }
 
-func SetStatus(count int, total int, current string, err []map[string]interface{}) {
+func SetStatus(count int, total int, current string, status int, err []map[string]interface{}) {
 	fileProcess := make(map[string]interface{})
 	fileProcess["count"] = count
 	fileProcess["total"] = total
 	fileProcess["current"] = current
+	fileProcess["status"] = status
 
 	if err != nil {
-		fileProcess["status"] = 1
 		for _, value := range err {
 			id := value["id"].(string)
 			utils.Client.LPush("error", id)
 			utils.Client.HMSet(id, value)
 		}
-	} else {
-		fileProcess["status"] = 1
 	}
 
 	utils.Client.HMSet("download", fileProcess)

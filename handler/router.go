@@ -17,24 +17,36 @@ func InitRouter() *gin.Engine {
 	r.Use(cors.Default())
 	gin.SetMode(conf.RunMode)
 
+	// User API
 	r.GET("/api/login", api.Login)
-	r.GET("/api/batch", api.BatchDownload)
+
+	// Batch Import API
 	r.GET("/api/batch/status", api.BatchStatus)
+
 	// NetEase API
 	r.GET("/api/song", api.PlayList)
 	r.GET("/api/song/detail", api.SongDetail)
 	r.GET("/api/song/url", api.SongURL)
 	r.GET("/api/lyric", api.SongLyric)
 
+	// Audio API
+	r.GET("/api/playlist", api.GetAllPlayList)
+	r.GET("/api/audio", api.GetAllAudio)
+	r.GET("/api/audio/download/:id/*type", api.DownloadFile)
+
 	handler := r.Group("/api")
 	handler.Use(middleware.JWT())
 	{
+		// Check token
 		handler.GET("/check", api.CheckToken)
-		handler.GET("/audio", api.GetAudioList)
-		handler.GET("/audio/download/:name/*type", api.DownloadFile)
+
+		// Audio API
 		handler.POST("/audio/upload", api.UploadFiles)
-		handler.DELETE("/audio/:name", api.DeleteAudio)
+		handler.DELETE("/audio/:id", api.DeleteAudio)
 		handler.POST("/audio", api.AddAudio)
+
+		// Batch Import API
+		r.GET("/api/batch", api.BatchDownload)
 	}
 
 	return r
