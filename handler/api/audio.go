@@ -34,7 +34,7 @@ func GetAllPlayList(c *gin.Context) {
 //获取音频列表
 func GetAllAudio(c *gin.Context) {
 	plID := c.Query("id")
-	audioList := utils.Client.LRange(plID, 0, -1)
+	audioList := utils.Client.LRange("pla:"+plID, 0, -1)
 
 	infoList := make([]map[string]string, len(audioList.Val()))
 

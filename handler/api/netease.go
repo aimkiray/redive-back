@@ -40,24 +40,25 @@ func BatchDownload(c *gin.Context) {
 	}
 
 	// 生成Playlist
-	plID := utils.GetRandom()
 	plName := playlist.Playlist.Name
 	playlistInfo := make(map[string]interface{})
-	playlistInfo["id"] = plID
+	playlistInfo["id"] = id
 	playlistInfo["name"] = plName
 
-	// 保存Playlist
-	utils.Client.LPush("playlist", plID)
-	utils.Client.HMSet(plID, playlistInfo)
-	// 插入Playlist，用于存放歌曲信息
-	utils.Client.LPush("audio-list", plID)
+	// 保存playlist元数据的key，便于提取
+	// TODO 但是复杂度增加了。可改用SCAN
+	utils.Client.LPush("playlist", "pl:"+id)
+	// 记录playlist信息
+	utils.Client.HMSet("pl:"+id, playlistInfo)
+
+	// 保存playlist所包含歌曲的key，便于提取
+	utils.Client.LPush("audio", "pla:"+id)
+
 	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(plName, "/", "*", -1) + "/"
 	createTime := time.Now().Format("2006/1/2 15:04:05")
 
 	tracks := playlist.Playlist.Tracks
 	songTotal := len(tracks)
-
-	utils.Client.LPush("file-process", "download")
 
 	// File download process
 	SetStatus(0, songTotal, "", 0, nil)
@@ -178,7 +179,7 @@ func BatchDownload(c *gin.Context) {
 
 		songInfo["id"] = songID
 		songInfo["name"] = songName
-		songInfo["playlist"] = plID
+		songInfo["playlist"] = id
 		songInfo["artist"] = value.Ar[0].Name
 		songInfo["audio"] = songPath
 		songInfo["cover"] = alPath
@@ -188,8 +189,10 @@ func BatchDownload(c *gin.Context) {
 		songInfo["from"] = "batch"
 		songInfo["others"] = ""
 
-		utils.Client.LPush(plID, songID)
-		utils.Client.HMSet(songID, songInfo)
+		// 保存歌曲key，便于提取
+		utils.Client.LPush("pla:"+id, "au:"+songID)
+		// 记录歌曲信息
+		utils.Client.HMSet("au:"+songID, songInfo)
 
 		SetStatus(index, songTotal, songName, 0, nil)
 	}
@@ -203,7 +206,7 @@ func BatchDownload(c *gin.Context) {
 }
 
 func BatchStatus(c *gin.Context) {
-	res := utils.Client.HGetAll("download").Val()
+	res := utils.Client.HGetAll("batch-import").Val()
 	// read error list
 	var errSongList []map[string]string
 	if res["status"] == "1" {
@@ -213,7 +216,7 @@ func BatchStatus(c *gin.Context) {
 			errSong := utils.Client.HGetAll(value).Val()
 			errSongList[index] = errSong
 		}
-		utils.Client.HSet("download", "status", 0)
+		utils.Client.HSet("batch-import", "status", 0)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -233,12 +236,12 @@ func SetStatus(count int, total int, current string, status int, err []map[strin
 	if err != nil {
 		for _, value := range err {
 			id := value["id"].(string)
-			utils.Client.LPush("error", id)
-			utils.Client.HMSet(id, value)
+			utils.Client.LPush("error", "err:"+id)
+			utils.Client.HMSet("err:"+id, value)
 		}
 	}
 
-	utils.Client.HMSet("download", fileProcess)
+	utils.Client.HMSet("batch-import", fileProcess)
 }
 
 //获取歌单内容，返回歌单内歌曲的简略信息

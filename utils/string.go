@@ -23,5 +23,5 @@ func InList(l []string, n string) bool {
 }
 
 func GetRandom() string {
-	return fmt.Sprintf("%10v", rand.New(rand.NewSource(time.Now().UnixNano())).Int63n(10000000000))
+	return fmt.Sprintf("%08v", rand.New(rand.NewSource(time.Now().UnixNano())).Int31()%100000000)
 }
