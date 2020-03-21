@@ -52,7 +52,7 @@ func BatchDownload(c *gin.Context) {
 	utils.Client.HMSet("pl:"+id, playlistInfo)
 
 	// 保存playlist所包含歌曲的key，便于提取
-	utils.Client.LPush("audio", "pla:"+id)
+	//utils.Client.LPush("audio", "pla:"+id)
 
 	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(plName, "/", "*", -1) + "/"
 	createTime := time.Now().Format("2006/1/2 15:04:05")
