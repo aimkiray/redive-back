@@ -17,6 +17,8 @@ import (
 	"github.com/aimkiray/reosu-server/utils"
 )
 
+// 批量导入歌单
+// TODO 拆分单独导入函数
 func BatchDownload(c *gin.Context) {
 	id := c.Query("id")
 	s := c.DefaultQuery("s", "8")
@@ -39,11 +41,14 @@ func BatchDownload(c *gin.Context) {
 		return
 	}
 
+	createTime := time.Now().Format("2006/1/2 15:04:05")
+
 	// 生成Playlist
 	plName := playlist.Playlist.Name
 	playlistInfo := make(map[string]interface{})
 	playlistInfo["id"] = id
 	playlistInfo["name"] = plName
+	playlistInfo["create"] = createTime
 
 	// 保存playlist元数据的key，便于提取
 	// TODO 但是复杂度增加了。可改用SCAN
@@ -55,7 +60,6 @@ func BatchDownload(c *gin.Context) {
 	//utils.Client.LPush("audio", "pla:"+id)
 
 	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(plName, "/", "*", -1) + "/"
-	createTime := time.Now().Format("2006/1/2 15:04:05")
 
 	tracks := playlist.Playlist.Tracks
 	songTotal := len(tracks)

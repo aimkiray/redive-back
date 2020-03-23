@@ -34,11 +34,16 @@ func InitRouter() *gin.Engine {
 	r.GET("/api/audio", api.GetAllAudio)
 	r.GET("/api/audio/download/:id/*type", api.DownloadFile)
 
+	// Require permissions
 	handler := r.Group("/api")
 	handler.Use(middleware.JWT())
 	{
 		// Check token
 		handler.GET("/check", api.CheckToken)
+
+		// Playlist API
+		handler.POST("/playlist", api.AddPlaylist)
+		handler.DELETE("/playlist/:id", api.DeletePlaylist)
 
 		// Audio API
 		handler.POST("/audio/upload", api.UploadFiles)
