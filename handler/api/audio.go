@@ -52,9 +52,7 @@ func doDeleteAudio(id string) int8 {
 	audioArtist := audioInfo["artist"]
 	plID := audioInfo["playlist"]
 
-	plName := utils.Client.HGet("pl:"+plID, "name").Val()
-
-	audioPath := conf.FileDIR + "/" + strings.Replace(plName, "/", "*", -1) + "/" + audioName + " - " + audioArtist
+	audioPath := conf.FileDIR + "/music/" + plID + "/" + audioArtist + " - " + audioName
 	err := os.RemoveAll(audioPath)
 	if err != nil {
 		return 0

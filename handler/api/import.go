@@ -17,8 +17,8 @@ import (
 	"github.com/aimkiray/reosu-server/utils"
 )
 
-// 批量导入歌单
-// TODO 拆分单独导入函数
+// 批量导入歌单歌曲
+// TODO 过长有待拆分（单曲导入）
 func BatchDownload(c *gin.Context) {
 	id := c.Query("id")
 	s := c.DefaultQuery("s", "8")
@@ -59,7 +59,7 @@ func BatchDownload(c *gin.Context) {
 	// 保存playlist所包含歌曲的key，便于提取
 	//utils.Client.LPush("audio", "pla:"+id)
 
-	baseFileDir := conf.FileDIR + "/music/" + strings.Replace(plName, "/", "*", -1) + "/"
+	baseFileDir := conf.FileDIR + "/music/" + id + "/"
 
 	tracks := playlist.Playlist.Tracks
 	songTotal := len(tracks)

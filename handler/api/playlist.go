@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -27,6 +26,7 @@ func GetAllPlayList(c *gin.Context) {
 }
 
 // 增加或修改playlist
+// 是否需要禁止重名
 func AddPlaylist(c *gin.Context) {
 	id := c.Query("id")
 	name := c.Query("name")
@@ -45,7 +45,7 @@ func AddPlaylist(c *gin.Context) {
 		utils.Client.HSet("pl:"+id, "name", name)
 		utils.Client.HSet("pl:"+id, "create", time.Now().Format("2006/1/2 15:04:05"))
 		// 替换分隔符
-		baseFileDir := conf.FileDIR + "/music/" + strings.Replace(name, "/", "*", -1)
+		baseFileDir := conf.FileDIR + "/music/" + id
 		os.MkdirAll(baseFileDir, os.ModePerm)
 	}
 
@@ -64,9 +64,10 @@ func DeletePlaylist(c *gin.Context) {
 		utils.Client.Del(value)
 	}
 	utils.Client.LRem("", 0, "pla:"+id)
-	plName := utils.Client.HGet("pl:"+id, "name").Val()
 
-	os.RemoveAll(conf.FileDIR + "/" + strings.Replace(plName, "/", "*", -1))
+	filePath := conf.FileDIR + "/music/" + id
+
+	os.RemoveAll(filePath)
 
 	utils.Client.Del("pl:" + id)
 	utils.Client.LRem("playlist", 0, "pl:"+id)
