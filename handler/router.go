@@ -17,38 +17,42 @@ func InitRouter() *gin.Engine {
 	r.Use(cors.Default())
 	gin.SetMode(conf.RunMode)
 
+	publicHandler := r.Group("/api")
+
 	// User API
-	r.GET("/api/login", api.Login)
+	publicHandler.GET("/login", api.Login)
 
 	// Batch Import API
-	r.GET("/api/batch/status", api.BatchStatus)
+	publicHandler.GET("/batch/status", api.BatchStatus)
 
 	// NetEase API
-	r.GET("/api/song", api.PlayList)
-	r.GET("/api/song/detail", api.SongDetail)
-	r.GET("/api/song/url", api.SongURL)
-	r.GET("/api/lyric", api.SongLyric)
+	publicHandler.GET("/song", api.PlayList)
+	publicHandler.GET("/song/detail", api.SongDetail)
+	publicHandler.GET("/song/url", api.SongURL)
+	publicHandler.GET("/lyric", api.SongLyric)
 
 	// Audio API
-	r.GET("/api/playlist", api.GetAllPlayList)
-	r.GET("/api/audio", api.GetAllAudio)
-	r.GET("/api/audio/download/:id/*type", api.DownloadFile)
+	publicHandler.GET("/playlist", api.GetAllPlayList)
+	publicHandler.GET("/audio", api.GetAllAudio)
+	publicHandler.GET("/audio/download/:id/*type", api.DownloadFile)
+	publicHandler.GET("/audio/region", api.GetRegion)
 
 	// Require permissions
-	handler := r.Group("/api")
-	handler.Use(middleware.JWT())
+	privateHandler := r.Group("/api")
+	privateHandler.Use(middleware.JWT())
 	{
 		// Check token
-		handler.GET("/check", api.CheckToken)
+		privateHandler.GET("/check", api.CheckToken)
 
 		// Playlist API
-		handler.POST("/playlist", api.AddPlaylist)
-		handler.DELETE("/playlist/:id", api.DeletePlaylist)
+		privateHandler.POST("/playlist", api.AddPlaylist)
+		privateHandler.DELETE("/playlist/:id", api.DeletePlaylist)
 
 		// Audio API
-		handler.POST("/audio/upload", api.UploadFiles)
-		handler.DELETE("/audio/:id", api.DeleteAudio)
-		handler.POST("/audio", api.AddAudio)
+		privateHandler.POST("/audio/upload", api.UploadFiles)
+		privateHandler.DELETE("/audio/:id", api.DeleteAudio)
+		privateHandler.POST("/audio", api.AddAudio)
+		privateHandler.PUT("/audio/region", api.UpdateRegion)
 
 		// Batch Import API
 		r.GET("/api/batch", api.BatchDownload)

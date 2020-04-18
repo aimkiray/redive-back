@@ -76,6 +76,14 @@ func AddAudio(c *gin.Context) {
 		return
 	}
 
+	if audioInfo["playlist"] == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"msg":  "未找到磁带",
+		})
+		return
+	}
+
 	// generate song ID
 	songID := utils.GetRandom()
 	audioInfo["id"] = songID
@@ -88,5 +96,47 @@ func AddAudio(c *gin.Context) {
 		"code": 1,
 		"msg":  "add audio success",
 		"id":   songID,
+	})
+}
+
+func GetRegion(c *gin.Context) {
+	//id, _ := c.GetPostForm("id")
+	//regions, _ := c.GetPostForm("regions")
+	regionInfo := make(map[string]interface{})
+	err := c.BindJSON(&regionInfo)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"msg":  "decode error",
+		})
+		return
+	}
+
+	utils.Client.HSet("au:"+regionInfo["id"].(string), "regions", regionInfo["regions"].(string))
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"msg":  "update audio success",
+	})
+}
+
+func UpdateRegion(c *gin.Context) {
+	//id, _ := c.GetPostForm("id")
+	//regions, _ := c.GetPostForm("regions")
+	regionInfo := make(map[string]interface{})
+	err := c.BindJSON(&regionInfo)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"msg":  "decode error",
+		})
+		return
+	}
+
+	utils.Client.HSet("au:"+regionInfo["id"].(string), "regions", regionInfo["regions"].(string))
+
+	c.JSON(http.StatusOK, gin.H{
+		"code": 1,
+		"msg":  "update audio success",
 	})
 }
