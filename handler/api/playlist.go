@@ -13,6 +13,14 @@ import (
 func GetAllPlayList(c *gin.Context) {
 	playlist := utils.Client.LRange("playlist", 0, -1)
 
+	if playlist.Val() == nil || len(playlist.Val()) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"code": 0,
+			"msg":  "no playlist",
+		})
+		return
+	}
+
 	infoList := make([]map[string]string, len(playlist.Val()))
 
 	for index, value := range playlist.Val() {

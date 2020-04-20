@@ -2,6 +2,7 @@ package conf
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/go-ini/ini"
@@ -36,7 +37,10 @@ func init() {
 }
 
 func loadBase() {
-	RunMode = Cfg.Section("").Key("RUN_MODE").MustString("debug")
+	RunMode = os.Getenv("RUN_MODE")
+	if RunMode == "" {
+		RunMode = Cfg.Section("").Key("RUN_MODE").MustString("debug")
+	}
 }
 
 func loadServer() {
@@ -51,7 +55,10 @@ func loadServer() {
 }
 
 func loadApp() {
-	JwtSecret = Cfg.Section("").Key("JWT_SECRET").MustString("akari")
+	JwtSecret = os.Getenv("JWT_SECRET")
+	if JwtSecret == "" {
+		JwtSecret = Cfg.Section("").Key("JWT_SECRET").MustString("akari")
+	}
 	FileDIR = Cfg.Section("file").Key("DIR").MustString("static/")
 	FileTypes = map[string]string{
 		"mp3":  "audio",
@@ -62,6 +69,12 @@ func loadApp() {
 		"webp": "cover",
 	}
 
-	UserName = Cfg.Section("admin").Key("USERNAME").MustString("admin")
-	PassWord = Cfg.Section("admin").Key("PASSWORD").MustString("admin")
+	UserName = os.Getenv("GIN_USERNAME")
+	if UserName == "" {
+		UserName = Cfg.Section("user").Key("USERNAME").MustString("admin")
+	}
+	PassWord = os.Getenv("GIN_PASSWORD")
+	if PassWord == "" {
+		PassWord = Cfg.Section("user").Key("PASSWORD").MustString("admin")
+	}
 }

@@ -15,10 +15,19 @@ import (
 //获取音频列表
 func GetAllAudio(c *gin.Context) {
 	plID := c.Query("id")
-	// 默认查询第一个歌单
+	// 默认查询最新加入的歌单
 	if plID == "" {
-		plID = strings.Split(utils.Client.LRange("playlist", 0, 0).Val()[0], ":")[1]
+		plList := utils.Client.LRange("playlist", 0, 0).Val()
+		if plList == nil || len(plList) != 1 {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 0,
+				"msg":  "no audio",
+			})
+			return
+		}
+		plID = strings.Split(plList[0], ":")[1]
 	}
+
 	audioList := utils.Client.LRange("pla:"+plID, 0, -1)
 
 	infoList := make([]map[string]string, len(audioList.Val()))

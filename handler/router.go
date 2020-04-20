@@ -55,7 +55,7 @@ func InitRouter() *gin.Engine {
 		privateHandler.PUT("/audio/region", api.UpdateRegion)
 
 		// Batch Import API
-		r.GET("/api/batch", api.BatchDownload)
+		privateHandler.GET("/batch", api.BatchDownload)
 	}
 
 	return r

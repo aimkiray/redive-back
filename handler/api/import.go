@@ -193,7 +193,7 @@ func BatchDownload(c *gin.Context) {
 		songInfo["from"] = "batch"
 		songInfo["others"] = ""
 
-		// 保存歌曲key，便于提取
+		// 保存歌曲key，便于取用
 		utils.Client.LPush("pla:"+id, "au:"+songID)
 		// 记录歌曲信息
 		utils.Client.HMSet("au:"+songID, songInfo)
