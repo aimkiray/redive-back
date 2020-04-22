@@ -108,11 +108,9 @@ func AddAudio(c *gin.Context) {
 	})
 }
 
-func GetRegion(c *gin.Context) {
-	//id, _ := c.GetPostForm("id")
-	//regions, _ := c.GetPostForm("regions")
-	regionInfo := make(map[string]interface{})
-	err := c.BindJSON(&regionInfo)
+func UpdateData(c *gin.Context) {
+	info := make(map[string]interface{})
+	err := c.BindJSON(&info)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code": 0,
@@ -121,31 +119,20 @@ func GetRegion(c *gin.Context) {
 		return
 	}
 
-	utils.Client.HSet("au:"+regionInfo["id"].(string), "regions", regionInfo["regions"].(string))
-
-	c.JSON(http.StatusOK, gin.H{
-		"code": 1,
-		"msg":  "update audio success",
-	})
-}
-
-func UpdateRegion(c *gin.Context) {
-	//id, _ := c.GetPostForm("id")
-	//regions, _ := c.GetPostForm("regions")
-	regionInfo := make(map[string]interface{})
-	err := c.BindJSON(&regionInfo)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"code": 0,
-			"msg":  "decode error",
-		})
-		return
+	if info["regions"] != nil {
+		utils.Client.HSet("au:"+info["id"].(string), "regions", info["regions"].(string))
 	}
 
-	utils.Client.HSet("au:"+regionInfo["id"].(string), "regions", regionInfo["regions"].(string))
+	if info["peaks"] != nil {
+		utils.Client.HSet("au:"+info["id"].(string), "peaks", info["peaks"].(string))
+	}
+
+	if info["duration"] != nil {
+		utils.Client.HSet("au:"+info["id"].(string), "duration", info["duration"].(string))
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"code": 1,
-		"msg":  "update audio success",
+		"msg":  "update data success",
 	})
 }

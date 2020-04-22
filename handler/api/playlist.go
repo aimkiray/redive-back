@@ -71,7 +71,7 @@ func DeletePlaylist(c *gin.Context) {
 		// del audio key
 		utils.Client.Del(value)
 	}
-	utils.Client.LRem("", 0, "pla:"+id)
+	utils.Client.Del("pla:" + id)
 
 	filePath := conf.FileDIR + "/music/" + id
 

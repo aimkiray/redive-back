@@ -1,12 +1,12 @@
 package handler
 
 import (
+	"github.com/aimkiray/reosu-server/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"github.com/aimkiray/reosu-server/conf"
 	"github.com/aimkiray/reosu-server/handler/api"
-	"github.com/aimkiray/reosu-server/middleware"
 )
 
 func InitRouter() *gin.Engine {
@@ -35,7 +35,6 @@ func InitRouter() *gin.Engine {
 	publicHandler.GET("/playlist", api.GetAllPlayList)
 	publicHandler.GET("/audio", api.GetAllAudio)
 	publicHandler.GET("/audio/download/:id/*type", api.DownloadFile)
-	publicHandler.GET("/audio/region", api.GetRegion)
 
 	// Require permissions
 	privateHandler := r.Group("/api")
@@ -52,7 +51,7 @@ func InitRouter() *gin.Engine {
 		privateHandler.POST("/audio/upload", api.UploadFiles)
 		privateHandler.DELETE("/audio/:id", api.DeleteAudio)
 		privateHandler.POST("/audio", api.AddAudio)
-		privateHandler.PUT("/audio/region", api.UpdateRegion)
+		privateHandler.PUT("/audio/data", api.UpdateData)
 
 		// Batch Import API
 		privateHandler.GET("/batch", api.BatchDownload)
