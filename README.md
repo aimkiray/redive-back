@@ -1,4 +1,6 @@
-ReDive 是一个可以管理音乐，学习嘤语的多功能复读机（CAI 不是什么高级焊工养成游戏= =），采用前后端分离架构，前端基于 Vue.js 全家桶，后端基于 Golang 编写，支持 Docker 部署。
+# Taste Guide
+
+ReDive 是一个可以管理音乐，学习嘤语的多功能复读机（cai不是什么高级焊工养成游戏= =），采用前后端分离架构，前端基于 Vue.js 全家桶，后端基于 Golang 编写，支持 Docker 部署。
 
 ## 目录
 
@@ -28,7 +30,7 @@ Demo 服务器是个土豆，不仅慢还 **404** 了 **上传/导入/更新** �
 
 波形需要等待音频完全加载，已有存档的除外。
 
-移动端没有完全适配，只是能用的程度，如有需要请等待后续开发。
+移动端没有完全适配，目前只是能用的程度，如有需要请等待后续开发。
 
 ## To Do
 
@@ -89,30 +91,34 @@ $ yarn build
 
 ### 安装 Docker
 
-先装你的 Docker CE，其他环境请看官方文档。
+测试环境为 CentOS 7，如需定制请参阅[官方文档](https://docs.docker.com/engine/install/centos/)。
 
 ```bash
-$ sudo yum install -y yum-utils
-$ sudo yum-config-manager \
-    --add-repo \
-    https://download.docker.com/linux/centos/docker-ce.repo
-$ sudo yum install docker-ce docker-ce-cli containerd.io
+$ curl -fsSL https://get.docker.com -o get-docker.sh
+$ sudo sh get-docker.sh
 $ sudo systemctl start docker
 ```
 
 使用国内的 Docker Hub 加快镜像下载，创建 daemon 的配置文件。
 
 ```bash
-$ sudo vim /etc/docker/daemon.json
+$ vim /etc/docker/daemon.json
 ```
 
-选择 USTC 的镜像源，写入如下内容。
+配置 daemon，通过国内的 Docker Hub 加快镜像下载。
+
+```bash
+$ vim /etc/docker/daemon.json
+```
+
+内容如下。
 
 ```json
 {
   "registry-mirrors": [
-    "https://docker.mirrors.ustc.edu.cn",
-    "https://registry.docker-cn.com"
+    "https://kohnnhik.mirror.aliyuncs.com",
+    "https://mirror.ccs.tencentyun.com",
+    "https://docker.mirrors.ustc.edu.cn"
   ]
 }
 ```
@@ -120,10 +126,10 @@ $ sudo vim /etc/docker/daemon.json
 安装 Docker Compose（以 1.25.5 版本为例）。
 
 ```bash
-$ sudo curl -L "https://github.com/docker/compose/releases/download/1.25.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-$ sudo chmod +x /usr/local/bin/docker-compose
+$ curl -L "https://github.com/docker/compose/releases/download/1.25.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+$ chmod +x /usr/local/bin/docker-compose
 # optional
-$ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+$ ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 ```
 
 ### 准备 Docker 镜像（可选）
@@ -132,11 +138,11 @@ $ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 
 ~~虽然通常的做法是前后端各用各的容器，使用`docker-compose`统一管理，但为了省去一些麻烦，我们完全可以把它们盛在同一个容器里，这样的吃法也被称为咖喱饭，宛如魔法一般的咖哩，煮上一大锅丢冰箱里可以连吃三天哟！~~
 
-上面的方法不太优雅，还是各用各的容器好一些。
+上面的方法显然不太优雅，还是各用各的容器好一些。
 
 > 这里提供一个通用的方法，如果你的餐桌不够大，请考虑能否吃到 Docker。
 
-新建一个空的工作目录，创建后端镜像的 Dockerfile 文件，写入如下内容。
+新建一个空的工作目录，创建后端 Dockerfile 文件，写入如下内容。
 
 ```dockerfile
 FROM alpine:latest
@@ -150,14 +156,16 @@ EXPOSE 2333
 CMD ["./redive-back"]
 ```
 
-~~`scratch` 是一个空镜像，意味着从第一层开始编写指令，Go 编写的程序常用此方法制作镜像节约空间，以适应微服务的需求。~~因缺少部分依赖，换用同样很小的`alpine linux`。
+~~基础镜像`scratch`是空的，意味着从第一层开始编写指令。Go 后端编译后生成一个二进制文件，常用此方法制作镜像节省空间。~~
+
+由于`scratch`镜像缺少部分必要依赖，换用同样很小的`alpine linux`。
 
 提前将`nginx`和`redis`等官方镜像 pull 下来备用。
 
 ```bash
-$ sudo docker pull alpine:latest
-$ sudo docker pull nginx:latest
-$ sudo docker pull redis:latest
+$ docker pull alpine:latest
+$ docker pull nginx:latest
+$ docker pull redis:latest
 ```
 
 ### 工作目录（可选）
@@ -167,7 +175,7 @@ $ sudo docker pull redis:latest
 找到之前编译的可执行文件`redive-back`，复制到工作目录，尝试构建名为`redive-back`的镜像。
 
 ```bash
-$ sudo docker build -t redive-back .
+$ docker build -t redive-back .
 ```
 
 将前端静态文件目录`dist`也复制过来。
@@ -263,7 +271,7 @@ services:
 修改文件所有者，避免一些奇奇怪怪的问题出现。
 
 ```bash
-$ sudo chown -R $USER:$USER .
+$ chown -R $USER:$USER .
 ```
 
 ### 我开动了
@@ -271,15 +279,15 @@ $ sudo chown -R $USER:$USER .
 进入工作目录或 release 解压后的 redive 目录，修改`docker-compose.yml`中的端口，`config.ini`中的用户信息。执行如下指令启动容器。
 
 ```bash
-$ sudo docker-compose build --no-cache
-$ sudo docker-compose up -d
+$ docker-compose build --no-cache
+$ docker-compose up -d
 ```
 
 停止和删除容器。
 
 ```bash
-$ sudo docker-compose stop
-$ sudo docker-compose rm
+$ docker-compose stop
+$ docker-compose rm
 ```
 
 Enjoy yourself~
@@ -334,8 +342,9 @@ ReDive 是单页面应用，路由使用 Vue Router 实现，全局数据交由 
 
 - Alpha 版本由于时间关系~~完全没有测试~~没有完全测试，但本人师承育碧，品质保证，尝试中发现什么 feature 或有什么想法欢迎提 issue 或 PR，以便改进。
 - 例如，某个 feature 是在某些情况下音频跟不上波形，然后你就可以计算你的无线音频设备（点名 Chromecast）输出延迟了（有时间会修的咕）。
-- 项目仍在开发中，近期忙着面试和毕业，只会修 bug，后续再完善功能。
+- 项目仍在开发中，近期忙着毕业，只会修 bug，后续再完善功能。
 - 至于为何叫这个名字，当然是因为它本来就是个~~缝合~~焊接怪呀～
+- 如果这个项目对您有所帮助，欢迎~~一键三连~~点个🌟支持一下哟！
 
 ## Reference
 
@@ -371,7 +380,7 @@ ReDive 是单页面应用，路由使用 Vue Router 实现，全局数据交由 
 
 ------
 
-***注意：ReDive 仅能用于 Golang/Vue.js/English 等相关技术的学习和在法律允许范围内的使用，任何个人或集体不得使用 ReDive 进行任何违反相关法律法规的活动。***
+***注意：ReDive 仅能用于 Golang/Vue.js/Language 等相关技术的学习和在法律允许范围内的使用，任何个人或集体不得使用 ReDive 进行任何违反相关法律法规的活动。***
 
 Note: ReDive can **ONLY** be used for learning related technologies such as Golang/Vue.js/English and use within the scope permitted by law. Any individual or group **MAY NOT** use ReDive for any violation of relevant laws and regulations.
 
